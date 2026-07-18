@@ -1,0 +1,6 @@
+{
+  "name": "MY STORE",
+  "description": "A high-fidelity electronics e-commerce platform featuring dynamic pricing, bulk discount systems, cart operations, checkout invoicing, and 20 interactive Business Intelligence analytics dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
