@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { DashboardType, DashboardData, Product } from '../types';
 import { playSoftClick } from '../lib/audio';
+import { apiClient } from '../lib/apiClient';
 
 interface BIDashboardProps {
   products: Product[];
@@ -90,12 +91,7 @@ export default function BIDashboard({
 
     setSavingSkuId(productId);
     try {
-      const res = await fetch(`/api/products/${productId}/edit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(edits)
-      });
-      const data = await res.json();
+      const data = await apiClient.editProduct(productId, edits);
       if (data.success) {
         onRefreshProducts(); // refresh products in parent
         setRefreshTrigger(prev => prev + 1); // refresh charts
@@ -118,9 +114,7 @@ export default function BIDashboard({
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const url = `/api/dashboards/${selectedDashboard}?category=${encodeURIComponent(categoryFilter)}&timeRange=${timeRange}&refreshTrigger=${refreshTrigger}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await apiClient.getDashboardData(selectedDashboard, categoryFilter, timeRange, refreshTrigger);
       setDashboardData(data);
     } catch (err) {
       console.error(err);
@@ -142,11 +136,7 @@ export default function BIDashboard({
       const randomProduct = products[Math.floor(Math.random() * products.length)];
       if (randomProduct && randomProduct.currentStock > 2) {
         try {
-          await fetch(`/api/products/${randomProduct.id}/stock`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'out', amount: Math.floor(1 + Math.random() * 3) })
-          });
+          await apiClient.reduceStock(randomProduct.id, Math.floor(1 + Math.random() * 3));
         } catch (e) {
           console.error(e);
         }
@@ -160,15 +150,10 @@ export default function BIDashboard({
   const handleUpdateRules = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/store-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceCurve: adminPriceCurve,
-          safetyStockLimit: adminSafetyLimit
-        })
+      const data = await apiClient.updateStoreConfig({
+        priceCurve: adminPriceCurve,
+        safetyStockLimit: adminSafetyLimit
       });
-      const data = await res.json();
       if (data.success) {
         setBusinessRules(data.businessRules);
         onRefreshProducts();

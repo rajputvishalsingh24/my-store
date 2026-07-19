@@ -7,6 +7,7 @@ import {
 import { Product, CartItem } from './types';
 import Storefront from './components/Storefront';
 import BIDashboard from './components/BIDashboard';
+import { apiClient } from './lib/apiClient';
 
 export default function App() {
   const [activeMode, setActiveMode] = useState<'storefront' | 'dashboard'>('storefront');
@@ -18,20 +19,22 @@ export default function App() {
   const [geminiActive, setGeminiActive] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isOfflineMode, setIsOfflineMode] = useState<boolean>(false);
 
-  // Synchronize store config and products catalog from server
+  // Synchronize store config and products catalog using the unified apiClient (Offline/Live auto-switching)
   const fetchStoreDetails = async () => {
     try {
-      const infoRes = await fetch('/api/store-info');
-      const infoData = await infoRes.json();
+      const isLive = await apiClient.detectMode();
+      setIsOfflineMode(!isLive);
+
+      const infoData = await apiClient.getStoreInfo();
       setBusinessRules(infoData.businessRules);
       setGeminiActive(infoData.geminiConfigured);
 
-      const prodRes = await fetch('/api/products');
-      const prodData = await prodRes.json();
+      const prodData = await apiClient.getProducts();
       setProducts(prodData);
     } catch (err) {
-      console.error("Failed to load details from Express Server:", err);
+      console.error("Failed to load details from API Client:", err);
     } finally {
       setLoading(false);
     }
@@ -44,8 +47,7 @@ export default function App() {
   // Sync products list when needed
   const handleRefreshProducts = async () => {
     try {
-      const prodRes = await fetch('/api/products');
-      const prodData = await prodRes.json();
+      const prodData = await apiClient.getProducts();
       setProducts(prodData);
     } catch (err) {
       console.error(err);
@@ -85,13 +87,8 @@ export default function App() {
   // Admin stocks replenish bypass action
   const handleReplenishStock = async (productId: string, qty: number) => {
     try {
-      const res = await fetch(`/api/products/${productId}/stock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'in', amount: qty })
-      });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiClient.replenishStock(productId, qty);
+      if (res.success) {
         await handleRefreshProducts();
       }
     } catch (err) {
@@ -137,10 +134,9 @@ export default function App() {
           : 'bg-white/85 border-slate-200 text-slate-800 shadow-sm'
       }`}>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-bold">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={`w-2 h-2 rounded-full animate-pulse ${isDarkMode ? 'bg-indigo-400' : 'bg-indigo-600'}`} />
             <span className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Mode Switcher Hub:</span>
-            <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>Currently executing:</span>
             <span className={`uppercase tracking-widest px-2.5 py-0.5 rounded-md border text-[10px] font-bold shadow-[0_0_15px_rgba(99,102,241,0.15)] ${
               isDarkMode 
                 ? 'bg-indigo-500/15 text-indigo-300 border-indigo-400/20' 
@@ -148,6 +144,38 @@ export default function App() {
             }`}>
               {activeMode === 'storefront' ? 'Consumer Storefront' : 'Business Intelligence Dashboards'}
             </span>
+            <div className="flex items-center gap-1.5 ml-0 md:ml-2">
+              {isOfflineMode ? (
+                <span className="bg-amber-500/15 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-md text-[10px] tracking-wide flex items-center gap-1 font-extrabold uppercase">
+                  🌐 Static Offline Mode (products.json)
+                </span>
+              ) : (
+                <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md text-[10px] tracking-wide flex items-center gap-1 font-extrabold uppercase">
+                  🟢 Live Express Sync Active
+                </span>
+              )}
+              <button
+                onClick={async () => {
+                  apiClient.setForceOffline(!isOfflineMode);
+                  const forceVal = !isOfflineMode;
+                  setIsOfflineMode(forceVal);
+                  // Refresh catalog and config with the new mode
+                  const infoData = await apiClient.getStoreInfo();
+                  setBusinessRules(infoData.businessRules);
+                  setGeminiActive(infoData.geminiConfigured);
+                  const prodData = await apiClient.getProducts();
+                  setProducts(prodData);
+                }}
+                className={`text-[9px] px-1.5 py-0.5 rounded border cursor-pointer transition-colors font-bold uppercase ${
+                  isDarkMode 
+                    ? 'border-white/10 hover:bg-white/10 text-slate-300' 
+                    : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                }`}
+                title="Toggle offline/online data source simulation"
+              >
+                🔄 Toggle Engine
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

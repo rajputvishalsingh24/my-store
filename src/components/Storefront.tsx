@@ -8,6 +8,7 @@ import {
 import { Product, CartItem, OrderSummary, Coupon } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import { playSoftClick, playCrackers } from '../lib/audio';
+import { apiClient } from '../lib/apiClient';
 
 interface StorefrontProps {
   products: Product[];
@@ -155,12 +156,7 @@ export default function Storefront({
     setAiLoading(true);
     setAiResponse('');
     try {
-      const res = await fetch('/api/search/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: aiSearchQuery })
-      });
-      const data = await res.json();
+      const data = await apiClient.aiSearch(aiSearchQuery);
       setAiResponse(data.response);
       setAiSource(data.source);
     } catch (err) {
@@ -270,12 +266,7 @@ export default function Storefront({
           shippingAddress: shippingAddress.trim() || 'No Address, Sourced Hub'
         };
 
-        const res = await fetch('/api/cart/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
+        const data = await apiClient.checkout(payload);
         if (data.success) {
           const isBulk = cart.some(item => item.quantity >= 10);
           if (isBulk) {
@@ -310,15 +301,7 @@ export default function Storefront({
     setChatLoading(true);
 
     try {
-      const response = await fetch('/api/chatbot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          history: chatMessages.slice(-8)
-        })
-      });
-      const data = await response.json();
+      const data = await apiClient.chatbot(query, chatMessages.slice(-8));
       setChatMessages(prev => [...prev, { role: 'bot', text: data.response }]);
     } catch (err) {
       console.error("Chatbot error:", err);
@@ -1009,16 +992,11 @@ export default function Storefront({
                       if (!newReviewName.trim() || !newReviewComment.trim()) return;
                       setSubmittingReview(true);
                       try {
-                        const res = await fetch(`/api/products/${selectedProduct.id}/review`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            userName: newReviewName,
-                            rating: newReviewRating,
-                            comment: newReviewComment
-                          })
+                        const data = await apiClient.addReview(selectedProduct.id, {
+                          userName: newReviewName,
+                          rating: newReviewRating,
+                          comment: newReviewComment
                         });
-                        const data = await res.json();
                         if (data.success) {
                           setSelectedProduct(data.product);
                           setNewReviewName('');
